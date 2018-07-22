@@ -1,14 +1,15 @@
 require('node-fetch')
 const http = require('http')
 const path = require('path')
-const PORT = process.env.PORT || 3000
 const { loadEnv } = require('parameter-store')
-process.env.AWS_SSM_REGION = 'us-east-1'
+const { AWS_REGION, PORT = 3000 } = process.env
+const region = AWS_REGION || 'us-east-1'
 
 async function init () {
-  await loadEnv('/docx-elasticbeanstalk', { region: 'us-east-1' })
+  await loadEnv('/docx-elasticbeanstalk', { region })
   process.env.AWS_S3_BUCKET_NAME = process.env.BUCKET_NAME
-  process.env.AWS_S3_BUCKET_REGION = 'us-east-1'
+  process.env.AWS_S3_BUCKET_REGION = region
+  process.env.AWS_SSM_REGION = region
   const { Pdf } = require('pdf-postprocess-s3')
 
   const handleMessage = async (message, done) => {
