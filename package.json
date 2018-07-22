@@ -1,0 +1,15 @@
+{
+  "name": "doc-to-pdf",
+  "version": "0.0.1",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "node-fetch": "^2.1.2",
+    "parameter-store": "^0.0.11",
+    "pdf-postprocess-s3": "^0.0.19"
+  }
+}

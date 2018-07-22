@@ -1,0 +1,20 @@
+language: node_js
+node_js:
+- 8.1.4
+sudo: required
+branches:
+  only:
+  - master
+install:
+- npm install --update-binary --no-shrinkwrap
+after_success: 
+deploy:
+  skip_cleanup: true
+  provider: elasticbeanstalk
+  access_key_id: "$AWS_ACCESS_KEY_ID"
+  secret_access_key:
+    secure: "$AWS_SECRET_ACCESS_KEY"
+  region: us-east-1
+  app: doc-to-pdf
+  env: doc-to-pdf-dev
+  bucket_name: elasticbeanstalk-us-east-1-761245233224
