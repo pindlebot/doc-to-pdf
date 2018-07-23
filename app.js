@@ -64,7 +64,7 @@ const convert = async ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
     }
   })
   managedUpload.send()
-  let readStream = fs.createReadStream(documentPath)
+  let readStream = fs.createReadStream(pdfPath)
   readStream.on('error', console.log)
   readStream.on('end', () => {
     console.log('end')
