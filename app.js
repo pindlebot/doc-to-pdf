@@ -60,7 +60,7 @@ const convert = async ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
     params: {
       Body: pass,
       Bucket: AWS_BUCKET,
-      Key: `${id}/${name}.pdf`
+      Key: `${id}/${basename}.pdf`
     }
   })
   managedUpload.send()
