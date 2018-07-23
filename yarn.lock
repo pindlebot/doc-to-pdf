@@ -182,11 +182,11 @@ path-is-absolute@^1.0.0:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/path-is-absolute/-/path-is-absolute-1.0.1.tgz#174b9268735534ffbc7ace6bf53a5a9e1b5c5f5f"
 
-pdf-postprocess-s3@^0.0.21:
-  version "0.0.21"
-  resolved "https://registry.yarnpkg.com/pdf-postprocess-s3/-/pdf-postprocess-s3-0.0.21.tgz#e85fff24b8ed1e3ae4026f72e45b1049305741b0"
+pdf-postprocess-s3@^0.0.23:
+  version "0.0.23"
+  resolved "https://registry.yarnpkg.com/pdf-postprocess-s3/-/pdf-postprocess-s3-0.0.23.tgz#9feb03f46673b14ff18e6733dd544096be380919"
   dependencies:
-    s3-tools "^0.0.14"
+    s3-tools "^0.0.16"
     scissors "^0.2.5"
     sqs-consumer "^3.8.0"
 
@@ -208,9 +208,9 @@ rimraf@~2.2.6:
   version "2.2.8"
   resolved "https://registry.yarnpkg.com/rimraf/-/rimraf-2.2.8.tgz#e439be2aaee327321952730f99a8929e4fc50582"
 
-s3-tools@^0.0.14:
-  version "0.0.14"
-  resolved "https://registry.yarnpkg.com/s3-tools/-/s3-tools-0.0.14.tgz#d15459f46585a3fbee0e7e2da327ddef36d168c3"
+s3-tools@^0.0.16:
+  version "0.0.16"
+  resolved "https://registry.yarnpkg.com/s3-tools/-/s3-tools-0.0.16.tgz#eff7c121f24b572a2bb2fac5cb8ba36278af9c1f"
 
 sax@1.2.1:
   version "1.2.1"

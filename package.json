@@ -11,6 +11,6 @@
   "dependencies": {
     "node-fetch": "^2.1.2",
     "parameter-store": "^0.0.11",
-    "pdf-postprocess-s3": "^0.0.21"
+    "pdf-postprocess-s3": "^0.0.23"
   }
 }

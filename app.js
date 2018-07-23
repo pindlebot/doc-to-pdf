@@ -6,7 +6,7 @@ const { AWS_REGION = 'us-east-1', PORT = 3000 } = process.env
 
 async function init () {
   await loadEnv('/doc-to-pdf', { region: AWS_REGION })
-  const { Pdf } = require('pdf-postprocess-s3')
+  const Pdf = require('pdf-postprocess-s3')
 
   const handleMessage = (message, done) => {
     let { MessageAttributes } = message
@@ -15,7 +15,9 @@ async function init () {
       params.token = MessageAttributes.token.StringValue
     }
     let pdf = new Pdf(params)
-    pdf.init().convert().then(done)
+    let val = pdf.init()
+    console.log(val)
+    val.convert().then(done)
   }
 
   let pdf = new Pdf({
