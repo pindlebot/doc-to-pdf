@@ -15,9 +15,10 @@ const {
 } = process.env
 process.env.AWS_BUCKET = 'printawesome'
 
-// const LIBRE_OFFICE_TMP_DIR = process.env.LIBRE_OFFICE_TMP_DIR || '/var/app/current/tmp'
+const LIBRE_OFFICE_TMP_DIR = process.env.LIBRE_OFFICE_TMP_DIR || '/var/app/current'
 const LIBRE_OFFICE_VERSION = process.env.LIBRE_OFFICE_VERSION || '6.0'
-const LIBRE_OFFICE_TMP_DIR = '/Users/ben/repos/doc-to-pdf'
+// const LIBRE_OFFICE_TMP_DIR = '/Users/ben/repos/doc-to-pdf'
+
 const command = filename =>
   `sudo /opt/libreoffice${LIBRE_OFFICE_VERSION}/program/soffice --headless --convert-to pdf:writer_pdf_Export "${filename}" --outdir ${LIBRE_OFFICE_TMP_DIR}`
 
@@ -40,41 +41,38 @@ const convert = async ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
   let writeStream = fs.createWriteStream(documentPath)
   await new Promise((resolve, reject) => {
     stream.pipe(writeStream)
-      .on('error', (err) => {
-        console.log(err)
-      })
-      .on('close', resolve)
+    stream.on('close', resolve)
+    stream.on('error', reject)
   })
   await new Promise((resolve, reject) => {
     exec(command(documentPath), (err, stdout, stderr) => {
-      if (err) reject(err)
-      resolve(true)
+      if (err) {
+        console.log(err)
+        reject(err)
+      } else {
+        resolve(true)
+      }
     })
   })
 
   let managedUpload
   const upload = () => {
-    let Body = new PassThrough() 
+    let Body = new PassThrough()
     AWS.config.update({ region: AWS_REGION })
     managedUpload = new AWS.S3.ManagedUpload({
-      tags,
       params: {
         Body,
         Bucket: AWS_BUCKET,
         Key: `${id}/${name}.pdf`
       }
-    })   
+    })
     managedUpload.send()
     return Body
   }
 
-  let pdfStream = fs.createReadStream(pdfPath).pipe(upload)
-  managedUpload.promise().catch(console.log)
+  fs.createReadStream(pdfPath).pipe(upload())
+  await managedUpload.promise().catch(console.log)
 
-  await new Promise((resolve, reject) => {
-    pdfStream.on('end', resolve)
-    pdfStream.on('error', reject)
-  })
   await new Promise((resolve, reject) => fs.unlink(documentPath, resolve))
   await new Promise((resolve, reject) => fs.unlink(pdfPath, resolve))
 }
