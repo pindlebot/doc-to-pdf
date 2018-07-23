@@ -9,6 +9,7 @@ async function init () {
   const Pdf = require('pdf-postprocess-s3')
 
   const handleMessage = (message, done) => {
+    console.log(message)
     let { MessageAttributes } = message
     let params = { key: message.Body }
     if (MessageAttributes.token) {
