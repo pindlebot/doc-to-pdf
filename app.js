@@ -41,8 +41,8 @@ const convert = async ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
   let writeStream = fs.createWriteStream(documentPath)
   await new Promise((resolve, reject) => {
     stream.pipe(writeStream)
-    stream.on('close', resolve)
-    stream.on('error', reject)
+    writeStream.on('close', resolve)
+    writeStream.on('error', reject)
   })
   await new Promise((resolve, reject) => {
     exec(command(documentPath), (err, stdout, stderr) => {
@@ -54,24 +54,25 @@ const convert = async ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
       }
     })
   })
-
-  let managedUpload
-  const upload = () => {
-    let Body = new PassThrough()
-    AWS.config.update({ region: AWS_REGION })
-    managedUpload = new AWS.S3.ManagedUpload({
-      params: {
-        Body,
-        Bucket: AWS_BUCKET,
-        Key: `${id}/${name}.pdf`
-      }
-    })
-    managedUpload.send()
-    return Body
-  }
-
-  fs.createReadStream(pdfPath).pipe(upload())
-  await managedUpload.promise().catch(console.log)
+  let pass = new PassThrough()
+  AWS.config.update({ region: AWS_REGION })
+  let managedUpload = new AWS.S3.ManagedUpload({
+    params: {
+      Body: pass,
+      Bucket: AWS_BUCKET,
+      Key: `${id}/${name}.pdf`
+    }
+  })
+  managedUpload.send()
+  let readStream = fs.createReadStream(documentPath)
+  readStream.on('error', console.log)
+  readStream.on('end', () => {
+    console.log('end')
+  })
+  readStream.pipe(pass)
+  await managedUpload.promise()
+    .catch(err => console.log(err))
+    .then(data => console.log(data))
 
   await new Promise((resolve, reject) => fs.unlink(documentPath, resolve))
   await new Promise((resolve, reject) => fs.unlink(pdfPath, resolve))
@@ -79,7 +80,7 @@ const convert = async ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
 
 async function init () {
   await loadEnv('/doc-to-pdf', { region: AWS_REGION })
-  
+
   let consumer = Consumer.create({
     queueUrl: process.env.SQS_ENDPOINT,
     messageAttributeNames: ['All'],
