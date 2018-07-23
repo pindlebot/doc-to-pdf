@@ -5,6 +5,7 @@ const fs = require('fs')
 const Consumer = require('sqs-consumer')
 const { exec } = require('child_process')
 const { loadEnv } = require('parameter-store')
+const { PassThrough } = require('stream')
 const AWS = require('aws-sdk')
 
 const {
@@ -14,72 +15,68 @@ const {
 } = process.env
 process.env.AWS_BUCKET = 'printawesome'
 
-const LIBRE_OFFICE_TMP_DIR = process.env.LIBRE_OFFICE_TMP_DIR || '/var/app/current/tmp'
+// const LIBRE_OFFICE_TMP_DIR = process.env.LIBRE_OFFICE_TMP_DIR || '/var/app/current/tmp'
 const LIBRE_OFFICE_VERSION = process.env.LIBRE_OFFICE_VERSION || '6.0'
-
+const LIBRE_OFFICE_TMP_DIR = '/Users/ben/repos/doc-to-pdf'
 const command = filename =>
   `sudo /opt/libreoffice${LIBRE_OFFICE_VERSION}/program/soffice --headless --convert-to pdf:writer_pdf_Export "${filename}" --outdir ${LIBRE_OFFICE_TMP_DIR}`
 
-const convert = ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
-  console.log('converting', key)
+const convert = async ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
   let [id, name] = key.split('/')
   let basename = path.basename(key, path.extname(key))
-  console.log({ id, name, basename })
-  let stream = s3.getObject({
+  let params = {
     Bucket: AWS_BUCKET,
     Key: key
-  }).createReadStream()
-
-  return new Promise((resolve, reject) => {
-    const logAndReject = (error) => {
-      console.log(error)
-      reject(error)
-    }
-    const documentPath = path.join(tmp, name)
-    const pdfPath = path.join(tmp, `${basename}.pdf`)
-    console.log({ documentPath, pdfPath })
-    stream.pipe(fs.createWriteStream(documentPath))
-    stream.on('error', reject)
-    stream.on('end', async () => {
-      await new Promise((resolve, _) => {
-        exec(command(filename), (err, stdout, stderr) => {
-          if (err) logAndReject(err)
-          resolve(true)
-        })
+  }
+  const s3 = new AWS.S3({ region: AWS_REGION })
+  let stream = await s3.headObject(params)
+    .promise()
+    .then(() => s3.getObject(params).createReadStream())
+    .catch(err => {
+      console.log(err)
+    })
+  const documentPath = path.join(tmp, name)
+  const pdfPath = path.join(tmp, `${basename}.pdf`)
+  let writeStream = fs.createWriteStream(documentPath)
+  await new Promise((resolve, reject) => {
+    stream.pipe(writeStream)
+      .on('error', (err) => {
+        console.log(err)
       })
-      // const tagging = await this.tagging
-      // const tags = tagging && tagging.TagSet
-      //  ? tagging.TagSet
-      //  : [{ Key: 'token', Value: this.token }]
-      let managedUpload
-      const upload = () => {
-        let Body = new PassThrough() 
-        AWS.config.update({ region: AWS_REGION })
-        managedUpload = new AWS.S3.ManagedUpload({
-          tags,
-          params: {
-            Body,
-            Bucket: AWS_BUCKET,
-            Key: `${id}/${name}.pdf`
-          }
-        })   
-        managedUpload.send()
-        return Body
-      }
-
-      managedUpload.promise().catch(logAndReject)
-    
-      let pdfStream = fs.createReadStream(pdfPath).pipe(
-        upload({ key: `${id}/${name}.pdf` })
-      )
-      await new Promise((resolve, reject) => {
-        pdfStream.on('end', resolve)
-        pdfStream.on('error', logAndReject)
-      })
-      await new Promise((resolve, reject) => fs.unlink(docxPath, resolve))
-      await new Promise((resolve, reject) => fs.unlink(pdfPath, resolve))
+      .on('close', resolve)
+  })
+  await new Promise((resolve, reject) => {
+    exec(command(documentPath), (err, stdout, stderr) => {
+      if (err) reject(err)
+      resolve(true)
     })
   })
+
+  let managedUpload
+  const upload = () => {
+    let Body = new PassThrough() 
+    AWS.config.update({ region: AWS_REGION })
+    managedUpload = new AWS.S3.ManagedUpload({
+      tags,
+      params: {
+        Body,
+        Bucket: AWS_BUCKET,
+        Key: `${id}/${name}.pdf`
+      }
+    })   
+    managedUpload.send()
+    return Body
+  }
+
+  let pdfStream = fs.createReadStream(pdfPath).pipe(upload)
+  managedUpload.promise().catch(console.log)
+
+  await new Promise((resolve, reject) => {
+    pdfStream.on('end', resolve)
+    pdfStream.on('error', reject)
+  })
+  await new Promise((resolve, reject) => fs.unlink(documentPath, resolve))
+  await new Promise((resolve, reject) => fs.unlink(pdfPath, resolve))
 }
 
 async function init () {
@@ -111,9 +108,9 @@ async function init () {
       res.end('OK')
     } else if (pathname.startsWith('/webhook')) {
       let key = decodeURIComponent(path.basename(pathname))
-      let data = await pdf.createMessage({ messageType: 's3' }, key)
+      // let data = await pdf.createMessage({ messageType: 's3' }, key)
       res.setHeader('Content-type', 'application/json')
-      res.end(JSON.stringify(data))
+      res.end(JSON.stringify({}))
     }
   }).listen(PORT, () => {
     console.log(`listening on http://localhost:${PORT}`)
