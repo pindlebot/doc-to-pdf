@@ -21,15 +21,20 @@ const command = filename =>
   `sudo /opt/libreoffice${LIBRE_OFFICE_VERSION}/program/soffice --headless --convert-to pdf:writer_pdf_Export "${filename}" --outdir ${LIBRE_OFFICE_TMP_DIR}`
 
 const convert = ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
-  console.log('converting', { key, tmp })
+  console.log('converting', key)
   let [id, name] = key.split('/')
   let basename = path.basename(key, path.extname(key))
+  console.log({ id, name, basename })
   let stream = s3.getObject({
     Bucket: AWS_BUCKET,
     Key: key
   }).createReadStream()
 
   return new Promise((resolve, reject) => {
+    const logAndReject = (error) => {
+      console.log(error)
+      reject(error)
+    }
     const documentPath = path.join(tmp, name)
     const pdfPath = path.join(tmp, `${basename}.pdf`)
     console.log({ documentPath, pdfPath })
@@ -38,7 +43,7 @@ const convert = ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
     stream.on('end', async () => {
       await new Promise((resolve, _) => {
         exec(command(filename), (err, stdout, stderr) => {
-          if (err) reject(err)
+          if (err) logAndReject(err)
           resolve(true)
         })
       })
@@ -46,10 +51,11 @@ const convert = ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
       // const tags = tagging && tagging.TagSet
       //  ? tagging.TagSet
       //  : [{ Key: 'token', Value: this.token }]
+      let managedUpload
       const upload = () => {
         let Body = new PassThrough() 
         AWS.config.update({ region: AWS_REGION })
-        let managedUpload = new AWS.S3.ManagedUpload({
+        managedUpload = new AWS.S3.ManagedUpload({
           tags,
           params: {
             Body,
@@ -60,13 +66,15 @@ const convert = ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
         managedUpload.send()
         return Body
       }
+
+      managedUpload.promise().catch(logAndReject)
     
       let pdfStream = fs.createReadStream(pdfPath).pipe(
         upload({ key: `${id}/${name}.pdf` })
       )
       await new Promise((resolve, reject) => {
         pdfStream.on('end', resolve)
-        pdfStream.on('error', reject)
+        pdfStream.on('error', logAndReject)
       })
       await new Promise((resolve, reject) => fs.unlink(docxPath, resolve))
       await new Promise((resolve, reject) => fs.unlink(pdfPath, resolve))
