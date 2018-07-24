@@ -105,6 +105,12 @@ async function init () {
     if (pathname === '/') {
       res.setHeader('Content-Type', 'text/html')
       res.end('OK')
+    } else if (pathname.startsWith('/convert')) {
+      let key = decodeURIComponent(path.basename(pathname))
+      console.log({ key })
+      convert({ key })
+      res.setHeader('Content-type', 'application/json')
+      res.end(JSON.stringify({}))
     } else if (pathname.startsWith('/webhook')) {
       let key = decodeURIComponent(path.basename(pathname))
       // let data = await pdf.createMessage({ messageType: 's3' }, key)
