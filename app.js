@@ -54,7 +54,8 @@ const convert = async ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
     params: {
       Body: pass,
       Bucket: AWS_BUCKET,
-      Key: `${id}/${basename}.pdf`
+      Key: `${id}/${basename}.pdf`,
+      ContentType: 'application/pdf'
     }
   })
   managedUpload.send()
@@ -87,7 +88,6 @@ async function init () {
       res.setHeader('Content-type', 'application/json')
       res.end(JSON.stringify({}))
     } else if (pathname.startsWith('/webhook')) {
-      // let data = await pdf.createMessage({ messageType: 's3' }, key)
       res.setHeader('Content-type', 'application/json')
       res.end(JSON.stringify({}))
     }
