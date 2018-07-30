@@ -90,6 +90,19 @@ async function init () {
     } else if (pathname.startsWith('/webhook')) {
       res.setHeader('Content-type', 'application/json')
       res.end(JSON.stringify({}))
+    } else if (pathname.startsWith('/s3')) {
+      res.setHeader('Content-type', 'application/pdf')
+      res.setHeader('Access-Control-Allow-Credentials', 'true')
+      res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,OPTIONS,POST,PUT,DELETE')
+      res.setHeader('Access-Control-Allow-Headers', 'Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers');
+      const s3 = new AWS.S3({
+        region: process.env.AWS_REGION
+      })
+      const stream = s3.getObject({
+        Bucket: AWS_BUCKET,
+        Key: key
+      }).createReadStream()
+      stream.pipe(res)
     }
   }).listen(PORT, () => {
     console.log(`listening on http://localhost:${PORT}`)
