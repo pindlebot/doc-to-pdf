@@ -18,6 +18,23 @@ const LIBRE_OFFICE_TMP_DIR = process.env.LIBRE_OFFICE_TMP_DIR || __dirname
 const command = filename =>
   `sudo /opt/libreoffice*/program/soffice --headless --convert-to pdf:writer_pdf_Export "${filename}" --outdir ${LIBRE_OFFICE_TMP_DIR}`
 
+async function getSub ({ key }) {
+  const data = await s3.getObjectTagging({
+    Key: key,
+    Bucket: AWS_BUCKET
+  }).promise()
+    .catch(err => {
+      console.log(err)
+    })
+    .then(data => {
+      console.log(data)
+      return data
+    })
+  return data && data.TagSet.length > 0
+    ? data.TagSet.find(tag => tag.Key === 'token').Value
+    : undefined
+}
+
 const convert = async ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
   let [id, name] = key.split('/')
   let basename = path.basename(key, path.extname(key))
@@ -26,12 +43,16 @@ const convert = async ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
     Key: key
   }
   const s3 = new AWS.S3({ region: AWS_REGION })
-  let stream = await s3.headObject(params)
-    .promise()
-    .then(() => s3.getObject(params).createReadStream())
-    .catch(err => {
-      throw err
-    })
+  let sub
+  try {
+    sub = await s3.getObjectTagging(params).promise()
+      .then(({ TagSet }) => TagSet.find(tag => tag.Key === 'sub').Value)
+  } catch (err) {
+    console.error(err)
+    return
+  }
+
+  let stream = s3.getObject(params).createReadStream()
   const documentPath = path.join(tmp, name)
   const pdfPath = path.join(tmp, `${basename}.pdf`)
   let writeStream = fs.createWriteStream(documentPath)
@@ -48,9 +69,14 @@ const convert = async ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
   }).catch(err => {
     throw err
   })
+
   let pass = new PassThrough()
   AWS.config.update({ region: AWS_REGION })
   let managedUpload = new AWS.S3.ManagedUpload({
+    tags: [{
+      Key: 'sub',
+      Value: sub
+    }],
     params: {
       Body: pass,
       Bucket: AWS_BUCKET,
