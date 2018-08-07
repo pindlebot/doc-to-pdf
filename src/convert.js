@@ -10,12 +10,12 @@ const {
 
 const path = require('path')
 
-const LIBRE_OFFICE_TMP_DIR = process.env.LIBRE_OFFICE_TMP_DIR || __dirname
+const LIBRE_OFFICE_TMP_DIR = process.env.LIBRE_OFFICE_TMP_DIR || '/tmp'
 
 const command = filename =>
   `sudo /opt/libreoffice*/program/soffice --headless --convert-to pdf:writer_pdf_Export "${filename}" --outdir ${LIBRE_OFFICE_TMP_DIR}`
 
-module.exports = async (documentPath, { tags }) => {
+module.exports = async (documentPath, { tags, key }) => {
   let basename = path.basename(documentPath, path.extname(documentPath))
   await new Promise((resolve, reject) => {
     exec(command(documentPath), (err, stdout, stderr) => {
@@ -37,7 +37,7 @@ module.exports = async (documentPath, { tags }) => {
     params: {
       Body: pass,
       Bucket: AWS_BUCKET,
-      Key: `${basename}.pdf`,
+      Key: key,
       ContentType: 'application/pdf'
     }
   })

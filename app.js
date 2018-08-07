@@ -39,15 +39,15 @@ async function init () {
         let { pathname } = url.parse(json.url)
         let parsed = path.parse(pathname)
         https.get(json.url, async resp => {
-          let key = randomBytes(10).toString('hex')
-          let docPath = path.join('/tmp', `${key}-${parsed.base}`)
+          let id = randomBytes(10).toString('hex')
+          let docPath = path.join('/tmp', `${id}-${parsed.base}`)
           let writeStream = fs.createWriteStream(docPath)
           await new Promise((resolve, reject) => {
             resp.pipe(writeStream)
             writeStream.on('close', resolve)
             writeStream.on('error', reject)
           })
-          await convert(docPath, { name: parsed.name, ...json })
+          await convert(docPath, { key, ...json })
         })
       }
       res.setHeader('Content-type', 'application/json')
