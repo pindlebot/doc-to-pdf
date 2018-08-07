@@ -1,100 +1,16 @@
 const http = require('http')
+const https = require('https')
 const path = require('path')
 const fs = require('fs')
-const { exec } = require('child_process')
 const { loadEnv } = require('parameter-store')
-const { PassThrough } = require('stream')
-const AWS = require('aws-sdk')
-
+const { randomBytes } = require('crypto')
+const convert = require('./src/convert')
 const {
   AWS_REGION = 'us-east-1',
   AWS_BUCKET = 'printawesome',
   PORT = 3000
 } = process.env
 process.env.AWS_BUCKET = 'printawesome'
-
-const LIBRE_OFFICE_TMP_DIR = process.env.LIBRE_OFFICE_TMP_DIR || __dirname
-
-const command = filename =>
-  `sudo /opt/libreoffice*/program/soffice --headless --convert-to pdf:writer_pdf_Export "${filename}" --outdir ${LIBRE_OFFICE_TMP_DIR}`
-
-async function getSub ({ key }) {
-  const data = await s3.getObjectTagging({
-    Key: key,
-    Bucket: AWS_BUCKET
-  }).promise()
-    .catch(err => {
-      console.log(err)
-    })
-    .then(data => {
-      console.log(data)
-      return data
-    })
-  return data && data.TagSet.length > 0
-    ? data.TagSet.find(tag => tag.Key === 'token').Value
-    : undefined
-}
-
-const convert = async ({ key }, tmp = LIBRE_OFFICE_TMP_DIR) => {
-  let [id, name] = key.split('/')
-  let basename = path.basename(key, path.extname(key))
-  let params = {
-    Bucket: AWS_BUCKET,
-    Key: key
-  }
-  const s3 = new AWS.S3({ region: AWS_REGION })
-  let sub
-  try {
-    sub = await s3.getObjectTagging(params).promise()
-      .then(({ TagSet }) => TagSet.find(tag => tag.Key === 'sub').Value)
-  } catch (err) {
-    console.error(err)
-    return
-  }
-
-  let stream = s3.getObject(params).createReadStream()
-  const documentPath = path.join(tmp, name)
-  const pdfPath = path.join(tmp, `${basename}.pdf`)
-  let writeStream = fs.createWriteStream(documentPath)
-  await new Promise((resolve, reject) => {
-    stream.pipe(writeStream)
-    writeStream.on('close', resolve)
-    writeStream.on('error', reject)
-  })
-  await new Promise((resolve, reject) => {
-    exec(command(documentPath), (err, stdout, stderr) => {
-      if (err) reject(err)
-      else resolve(true)
-    })
-  }).catch(err => {
-    throw err
-  })
-
-  let pass = new PassThrough()
-  AWS.config.update({ region: AWS_REGION })
-  let managedUpload = new AWS.S3.ManagedUpload({
-    tags: [{
-      Key: 'sub',
-      Value: sub
-    }],
-    params: {
-      Body: pass,
-      Bucket: AWS_BUCKET,
-      Key: `${id}/${basename}.pdf`,
-      ContentType: 'application/pdf'
-    }
-  })
-  managedUpload.send()
-  let readStream = fs.createReadStream(pdfPath)
-  readStream.on('error', console.error.bind(console))
-  readStream.pipe(pass)
-  await managedUpload.promise()
-    .catch(err => console.log(err))
-    .then(data => console.log(data))
-
-  await new Promise((resolve, reject) => fs.unlink(documentPath, resolve))
-  await new Promise((resolve, reject) => fs.unlink(pdfPath, resolve))
-}
 
 async function init () {
   await loadEnv('/doc-to-pdf', { region: AWS_REGION })
@@ -110,25 +26,35 @@ async function init () {
       res.setHeader('Content-Type', 'text/html')
       res.end('OK')
     } else if (pathname.startsWith('/convert')) {
-      convert({ key })
+      let body = ''
+      req.on('data', (chunk) => {
+        body += chunk.toString()
+      })
+      let json = await new Promise((resolve, reject) => {
+        req.on('end', () => {
+          resolve(JSON.parse(body))
+        })
+      })
+      if (json.url) {
+        let { pathname } = url.parse(json.url)
+        let parsed = path.parse(pathname)
+        https.get(json.url, async resp => {
+          let key = randomBytes(10).toString('hex')
+          let docPath = path.join('/tmp', `${key}-${parsed.base}`)
+          let writeStream = fs.createWriteStream(docPath)
+          await new Promise((resolve, reject) => {
+            resp.pipe(writeStream)
+            writeStream.on('close', resolve)
+            writeStream.on('error', reject)
+          })
+          await convert(docPath, { name: parsed.name, ...json })
+        })
+      }
       res.setHeader('Content-type', 'application/json')
       res.end(JSON.stringify({}))
     } else if (pathname.startsWith('/webhook')) {
       res.setHeader('Content-type', 'application/json')
       res.end(JSON.stringify({}))
-    } else if (pathname.startsWith('/s3')) {
-      res.setHeader('Content-type', 'application/pdf')
-      res.setHeader('Access-Control-Allow-Credentials', 'true')
-      res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,OPTIONS,POST,PUT,DELETE')
-      res.setHeader('Access-Control-Allow-Headers', 'Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers');
-      const s3 = new AWS.S3({
-        region: process.env.AWS_REGION
-      })
-      const stream = s3.getObject({
-        Bucket: AWS_BUCKET,
-        Key: key
-      }).createReadStream()
-      stream.pipe(res)
     }
   }).listen(PORT, () => {
     console.log(`listening on http://localhost:${PORT}`)
