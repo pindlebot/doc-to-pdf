@@ -1,0 +1,302 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "AWS CloudFormation template",
+  "Parameters": {
+    "InstanceType": {
+      "Type": "String",
+      "Default": "t2.micro"
+    },
+    "ElasticIP": {
+      "Type": "String",
+      "Default": "52.3.168.95"
+    },
+    "VpcId": {
+      "Type": "String",
+      "Default": "vpc-f2438588"
+    },
+    "SubnetId": {
+      "Type": "String",
+      "Default": "subnet-c7e3509b"
+    },
+    "KeyPair": {
+      "Type": "String",
+      "Default": "aws-eb2"
+    }
+  },
+  "Resources": {
+    "InstanceWaitHandle": { "Type": "AWS::CloudFormation::WaitConditionHandle" },
+    "InstanceWaitCondition": {
+      "Type": "AWS::CloudFormation::WaitCondition",
+      "DependsOn": "Instance",
+      "Properties": { "Handle": { "Ref": "InstanceWaitHandle" }, "Timeout": "900", "Count": "1" }
+    },
+    "InstanceSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Enable HTTP, HTTPS and SSH access",
+        "VpcId": {
+          "Ref": "VpcId"
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "443",
+            "ToPort": "443",
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "22",
+            "ToPort": "22",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "InstanceRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "ec2.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "EC2Access",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ec2:*",
+                    "autoscaling:*"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "S3Access",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "s3:*",
+                  "Resource": "*"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "CfnAccess",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudformation:DescribeStackResource"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "InstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [
+          {
+            "Ref": "InstanceRole"
+          }
+        ]
+      }
+    },
+    "Instance": {
+      "Type": "AWS::EC2::Instance",
+      "Metadata": {
+        "AWS::CloudFormation::Init": {
+          "config": {
+            "packages": {
+              "yum": {
+                "ghostscript": [],
+                "gcc-c++": [] ,
+                "make": [],
+                "git": [],
+                "cairo": [],
+                "cairo-devel": [],
+                "libjpeg-turbo-devel": [],
+                "giflib-devel": [],
+                "libpng-devel": [],
+                "dbus-glib": [],
+                "strace": []
+              }
+            },
+            "files": {
+              "/etc/init/app.conf": {
+                "content": {
+                  "Fn::Join": ["", [
+                    "start on runlevel [2345]\n",
+                    "stop on runlevel [016]\n",
+                    "respawn\n",
+                    "chdir /var/task/app\n",
+                    "exec node app.js"
+                  ]]
+                },
+                "mode": "000644",
+                "owner": "root",
+                "group": "root"
+              }
+            },
+            "commands": {
+              "01-install-nvm": {
+                "command": "su ec2-user -c \"curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.2/install.sh | bash\""
+              },
+              "02-install-node": {
+                "command": "su ec2-user -c \"source ~/.bash_profile && nvm install node\""
+              },
+              "03-symlink": {
+                "command": "ln -s /home/ec2-user/.nvm/versions/node/v10.11.0/bin/node /usr/bin/node"
+              },
+              "04-install-npm": {
+                "command": "su ec2-user -c \"cd /tmp && curl -L https://www.npmjs.com/install.sh | sh\""
+              },
+              "05-symlink": {
+                "command": "ln -s /home/ec2-user/.nvm/versions/node/v10.11.0/bin/npm /usr/bin/npm"
+              },
+              "06-fix-perm": {
+                "command": "echo \"ec2-user ALL = NOPASSWD: /opt/libreoffice6.1/program/soffice\" >> /etc/sudoers",
+                "test": "! grep -q \"libreoffice\" \"/etc/sudoers\""
+              },
+              "07-install-office-libre-1": {
+                "command": "cd /tmp && wget -qO- https://download.documentfoundation.org/libreoffice/stable/6.1.0/rpm/x86_64/LibreOffice_6.1.0_Linux_x86-64_rpm.tar.gz | tar xvz"
+              },
+              "08-install-office-libre-2": {
+                "command": "yes | sudo yum localinstall /tmp/LibreOffice*/RPMS/*rpm"
+              },
+              "09-fix-perm": {
+                "command": "chown root:root /opt/libreoffice6.1/program/soffice"
+              },
+              "10-add-soffice-to-path": {
+                "command": "ln -s /opt/libreoffice6.1/program/soffice /usr/bin/soffice"
+              },
+              "11-fix-perm": {
+                "command": "chmod 4775 /opt/libreoffice6.1/program/soffice"
+              },
+              "12-mkdir": {
+                "command": "mkdir -p /var/task && chown ec2-user:root /var/task"
+              },
+              "13-clone-app": {
+                "command": "su ec2-user -c \"git clone https://github.com/unshift/doc-to-pdf.git /var/task/app\""
+              },
+              "14-install-app": {
+                "command": "su ec2-user -c \"cd /var/task/app && npm install\""
+              },
+              "15-add-secret": {
+                "command": "echo \"SECRET_TOKEN=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)\" > /var/task/app/.env"
+              },
+              "90-signal-done": {
+                "command": {
+                  "Fn::Join": [
+                    "",
+                    ["/opt/aws/bin/cfn-signal -e 0 --resource Instance '", { "Ref": "InstanceWaitHandle" }, "'"]
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "Properties": {
+        "ImageId": "ami-4fffc834",
+        "InstanceType": {
+          "Ref": "InstanceType"
+        },
+        "SecurityGroupIds": [{
+          "Ref": "InstanceSecurityGroup"
+        }],
+        "KeyName": {
+          "Ref": "KeyPair"
+        },
+        "IamInstanceProfile": {
+          "Ref": "InstanceProfile"
+        },
+        "SubnetId": {
+          "Ref": "SubnetId"
+        },
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "",
+              [
+                "#!/bin/bash -v\n",
+                "echo timeout=60 >> /etc/yum.conf\n",
+                "echo retries=20 >> /etc/yum.conf\n",
+                "yum update -y -q aws-cfn-bootstrap\n",
+                "function handle_error\n",
+                "{\n",
+                "ERR_FILE=$(mktemp)\n",
+                "(grep ERROR /var/log/cfn-init.log | sed -e 's/^.*] //' >> $ERR_FILE) || true\n",
+                "(tac /var/log/cfn-init-cmd.log | grep -m 1 -B 100 ==== | tac | sed -e 's/^.*] //' -e '/^=*$/d' >> $ERR_FILE) || true\n",
+                "/opt/aws/bin/cfn-signal -s false -e $1 -r \"Output: `cat $ERR_FILE`\" '",
+                { "Ref": "InstanceWaitHandle" },
+                "'\n",
+                "  exit 1\n",
+                "}\n",
+                "trap 'handle_error $? ${LINENO}' ERR\n",
+                "/opt/aws/bin/cfn-init -s ",
+                { "Ref": "AWS::StackName" },
+                " --resource Instance ",
+                "--region ",
+                { "Ref": "AWS::Region" },
+                "\n"
+              ]
+            ]
+          }
+        }
+      }
+    },
+    "EIPAssociation": {
+      "Type": "AWS::EC2::EIPAssociation",
+      "Properties": {
+        "InstanceId": {
+          "Ref": "Instance"
+        },
+        "EIP": {
+          "Ref": "ElasticIP"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "Instance": {
+      "Value": { "Fn::GetAtt": ["Instance", "PublicDnsName"] }
+    }
+  }
+}
