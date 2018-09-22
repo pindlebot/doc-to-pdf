@@ -4,12 +4,11 @@ const fs = require('fs')
 const AWS = require('aws-sdk')
 const {
   AWS_REGION = 'us-east-1',
-  AWS_BUCKET = 'printawesome'
+  AWS_BUCKET = 'printawesome',
+  LIBRE_OFFICE_TMP_DIR = '/tmp'
 } = process.env
 
 const path = require('path')
-
-const LIBRE_OFFICE_TMP_DIR = process.env.LIBRE_OFFICE_TMP_DIR || '/tmp'
 
 const command = filename =>
   `sudo /opt/libreoffice*/program/soffice --headless --convert-to pdf:writer_pdf_Export "${filename}" --outdir ${LIBRE_OFFICE_TMP_DIR}`

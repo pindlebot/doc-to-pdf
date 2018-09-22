@@ -2,18 +2,12 @@ const http = require('http')
 const https = require('https')
 const path = require('path')
 const fs = require('fs')
-const { loadEnv } = require('parameter-store')
 const { randomBytes } = require('crypto')
 const convert = require('./src/convert')
-const {
-  AWS_REGION = 'us-east-1',
-  AWS_BUCKET = 'printawesome',
-  PORT = 3000
-} = process.env
-process.env.AWS_BUCKET = 'printawesome'
+const { PORT = 80 } = process.env
 
 async function init () {
-  await loadEnv('/doc-to-pdf', { region: AWS_REGION })
+  // await loadEnv('/doc-to-pdf', { region: AWS_REGION })
 
   http.createServer(async (req, res) => {
     let url = require('url').parse(req.url)
