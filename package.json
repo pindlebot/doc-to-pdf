@@ -7,7 +7,7 @@
     "start": "node app.js",
     "test": "echo \"test\"",
     "lint": "standard \"src/*.js\" --fix",
-    "deploy": "aws --region us-east-1 cloudformation create-stack --template-body file://cf.json --stack-name word-convert --capabilities CAPABILITY_IAM"
+    "deploy": "aws --region us-east-1 cloudformation create-stack --template-body file://cf.json --stack-name word-convert-dev --capabilities CAPABILITY_IAM"
   },
   "license": "ISC",
   "dependencies": {

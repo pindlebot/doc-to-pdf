@@ -166,7 +166,7 @@
                     "stop on runlevel [016]\n",
                     "respawn\n",
                     "chdir /var/task/app\n",
-                    "exec node app.js"
+                    "exec node app.js 2>/tmp/upstart.log"
                   ]]
                 },
                 "mode": "000644",
@@ -179,55 +179,61 @@
                 "command": "su ec2-user -c \"curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.2/install.sh | bash\""
               },
               "02-install-node": {
-                "command": "su ec2-user -c \"source ~/.bash_profile && nvm install node\""
+                "command": "su ec2-user -c \"source /home/ec2-user/.nvm/nvm.sh && nvm install node\""
               },
-              "03-symlink": {
+              "03-use-node": {
+                "command": "su ec2-user -c \"source /home/ec2-user/.nvm/nvm.sh && nvm use node\""
+              },
+              "04-symlink": {
                 "command": "ln -s /home/ec2-user/.nvm/versions/node/v10.11.0/bin/node /usr/bin/node"
-              },
-              "04-install-npm": {
-                "command": "su ec2-user -c \"cd /tmp && curl -L https://www.npmjs.com/install.sh | sh\""
               },
               "05-symlink": {
                 "command": "ln -s /home/ec2-user/.nvm/versions/node/v10.11.0/bin/npm /usr/bin/npm"
               },
-              "06-fix-perm": {
+              "06-npm-version": {
+                "command": "su ec2-user -c \"npm --version\""
+              },
+              "07-fix-perm": {
                 "command": "echo \"ec2-user ALL = NOPASSWD: /opt/libreoffice6.1/program/soffice\" >> /etc/sudoers",
                 "test": "! grep -q \"libreoffice\" \"/etc/sudoers\""
               },
-              "07-install-office-libre-1": {
+              "08-install-office-libre-1": {
                 "command": "cd /tmp && wget -qO- https://download.documentfoundation.org/libreoffice/stable/6.1.0/rpm/x86_64/LibreOffice_6.1.0_Linux_x86-64_rpm.tar.gz | tar xvz"
               },
-              "08-install-office-libre-2": {
+              "09-install-office-libre-2": {
                 "command": "yes | sudo yum localinstall /tmp/LibreOffice*/RPMS/*rpm"
               },
-              "09-fix-perm": {
+              "10-fix-perm": {
                 "command": "chown root:root /opt/libreoffice6.1/program/soffice"
               },
-              "10-add-soffice-to-path": {
+              "11-add-soffice-to-path": {
                 "command": "ln -s /opt/libreoffice6.1/program/soffice /usr/bin/soffice"
               },
-              "11-fix-perm": {
+              "12-fix-perm": {
                 "command": "chmod 4775 /opt/libreoffice6.1/program/soffice"
               },
-              "12-mkdir": {
+              "13-mkdir": {
                 "command": "mkdir -p /var/task && chown ec2-user:root /var/task"
               },
-              "13-clone-app": {
+              "14-clone-app": {
                 "command": "su ec2-user -c \"git clone https://github.com/unshift/doc-to-pdf.git /var/task/app\""
               },
-              "14-install-app": {
+              "15-install-app": {
                 "command": "su ec2-user -c \"cd /var/task/app && npm install\""
               },
-              "15-add-secret": {
+              "16-add-secret": {
                 "command": "echo \"SECRET_TOKEN=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)\" > /var/task/app/.env"
               },
-              "90-signal-done": {
+              "17-signal-done": {
                 "command": {
                   "Fn::Join": [
                     "",
                     ["/opt/aws/bin/cfn-signal -e 0 --resource Instance '", { "Ref": "InstanceWaitHandle" }, "'"]
                   ]
                 }
+              },
+              "18-start-server": {
+                "command": "initctl start app"
               }
             }
           }

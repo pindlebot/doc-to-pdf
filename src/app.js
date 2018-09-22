@@ -5,7 +5,7 @@ const path = require('path')
 const fs = require('fs')
 const { randomBytes } = require('crypto')
 const convert = require('./convert')
-const { PORT = 80 } = process.env
+const { PORT = 3000 } = process.env
 const url = require('url')
 const jwt = require('jsonwebtoken')
 const bodyParser = async (req, res) => {
@@ -39,9 +39,10 @@ const handleConvert = (json) => {
 
 http.createServer(async (req, res) => {
   let { pathname } = url.parse(req.url)
+  console.log(pathname)
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.statusCode = 200
-  let [_, token] = (req.headers.authorization || '').match(/(?:[Bb]earer\s)(.*)/)
+  let [_, token] = (req.headers.authorization || '').match(/(?:[Bb]earer\s)(.*)/) || [null, null]
   let decoded
   if (token) {
     decoded = await new Promise((resolve, reject) =>
